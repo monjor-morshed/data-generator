@@ -29,40 +29,6 @@ function App() {
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const generateRecord = (index, region, errorsPerRecord, seed) => {
-    const faker = getLocale(region);
-    const combinedSeed = `${seed}-${index}`;
-    const seedValue = seedrandom(combinedSeed).int32();
-    faker.seed(seedValue);
-    const rng = seedrandom(combinedSeed);
-    const identifier = faker.string.uuid();
-    const name = `${faker.person.firstName()} ${faker.person.middleName()} ${faker.person.lastName()}`;
-    const address = generateAddress(region, faker);
-    const phone = generatePhone(region, faker);
-
-    const record = {
-      index,
-      identifier,
-      name,
-      address,
-      phone,
-    };
-    const errorsToApply = Math.floor(errorsPerRecord);
-    const fractionalError = errorsPerRecord - errorsToApply;
-    let totalErrors = errorsToApply;
-
-    if (fractionalError > rng()) {
-      totalErrors += 1;
-    }
-
-    for (let e = 0; e < totalErrors; e++) {
-      applyRandomError(record, rng, region);
-    }
-
-    return record;
-  };
-
   const applyRandomError = (record, rng, region) => {
     const fields = ["name", "address", "phone"];
     const fieldIndex = Math.floor(rng() * fields.length);
@@ -147,19 +113,45 @@ function App() {
   useEffect(() => {
     const fetchData = () => {
       setIsFetching(true);
-      const totalRecordsBefore =
-        pageNumber === 1 ? 0 : 20 + (pageNumber - 2) * 10;
+      const totalRecordsBefore = (pageNumber - 1) * recordsPerPage;
       const newData = [];
 
       for (let i = 0; i < recordsPerPage; i++) {
-        const index = totalRecordsBefore + i + 1;
+        const index = totalRecordsBefore + i + 1; // Adjusted index calculation
+        if (index > 1000) break; // Stop if index exceeds 1000
         try {
-          const record = generateRecord(
-            index,
-            region,
-            parseFloat(errorsPerRecord),
-            seed
-          );
+          const record = ((index, region, errorsPerRecord, seed) => {
+            const faker = getLocale(region);
+            const combinedSeed = `${seed}-${index}`;
+            const seedValue = seedrandom(combinedSeed).int32();
+            faker.seed(seedValue);
+            const rng = seedrandom(combinedSeed);
+            const identifier = faker.string.uuid();
+            const name = `${faker.person.firstName()} ${faker.person.middleName()} ${faker.person.lastName()}`;
+            const address = generateAddress(region, faker);
+            const phone = generatePhone(region, faker);
+
+            const record = {
+              index,
+              identifier,
+              name,
+              address,
+              phone,
+            };
+            const errorsToApply = Math.floor(errorsPerRecord);
+            const fractionalError = errorsPerRecord - errorsToApply;
+            let totalErrors = errorsToApply;
+
+            if (fractionalError > rng()) {
+              totalErrors += 1;
+            }
+
+            for (let e = 0; e < totalErrors; e++) {
+              applyRandomError(record, rng, region);
+            }
+
+            return record;
+          })(index, region, parseFloat(errorsPerRecord), seed);
           newData.push(record);
         } catch (error) {
           console.error(`Error generating record ${index}:`, error);
@@ -176,14 +168,7 @@ function App() {
     };
 
     fetchData();
-  }, [
-    pageNumber,
-    region,
-    errorsPerRecord,
-    seed,
-    generateRecord,
-    recordsPerPage,
-  ]);
+  }, [pageNumber, region, errorsPerRecord, seed, recordsPerPage]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -195,6 +180,7 @@ function App() {
         setPageNumber((prevPageNumber) => prevPageNumber + 1);
       }
     };
+
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isFetching]);
